@@ -7,12 +7,12 @@ from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjecti
 from library.strategy_base import TokenizeStrategy, TextEncodingStrategy, TextEncoderOutputsCachingStrategy
 
 
-from library.utils import setup_logging
 
-setup_logging()
-import logging
 
-logger = logging.getLogger(__name__)
+
+
+
+
 
 
 TOKENIZER1_PATH = "openai/clip-vit-large-patch14"
@@ -248,7 +248,7 @@ class SdxlTextEncoderOutputsCachingStrategy(TextEncoderOutputsCachingStrategy):
             if "hidden_state1" not in npz or "hidden_state2" not in npz or "pool2" not in npz:
                 return False
         except Exception as e:
-            logger.error(f"Error loading file: {npz_path}")
+            print(f"Error loading file: {npz_path}")
             raise e
 
         return True

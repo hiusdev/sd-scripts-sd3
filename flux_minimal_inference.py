@@ -23,12 +23,12 @@ from networks import oft_flux
 init_ipex()
 
 
-from library.utils import setup_logging, str_to_dtype
+from library.utils import str_to_dtype
 
-setup_logging()
-import logging
 
-logger = logging.getLogger(__name__)
+
+
+
 
 import networks.lora_flux as lora_flux
 from library import flux_models, flux_utils, sd3_utils, strategy_flux
@@ -79,7 +79,7 @@ def denoise(
     cfg_scale: Optional[float] = None,
 ):
     # this is ignored for schnell
-    logger.info(f"guidance: {guidance}, cfg_scale: {cfg_scale}")
+    print(f"guidance: {guidance}, cfg_scale: {cfg_scale}")
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
 
     # prepare classifier free guidance
@@ -148,7 +148,7 @@ def do_sample(
     neg_t5_attn_mask: Optional[torch.Tensor] = None,
     cfg_scale: Optional[float] = None,
 ):
-    logger.info(f"num_steps: {num_steps}")
+    print(f"num_steps: {num_steps}")
     timesteps = get_schedule(num_steps, img.shape[1], shift=not is_schnell)
 
     # denoise initial noise
@@ -205,7 +205,7 @@ def generate_image(
     cfg_scale: float,
 ):
     seed = seed if seed is not None else random.randint(0, 2**32 - 1)
-    logger.info(f"Seed: {seed}")
+    print(f"Seed: {seed}")
 
     # make first noise with packed shape
     # original: b,16,2*h//16,2*w//16, packed: b,h//16*w//16,16*2*2
@@ -232,13 +232,13 @@ def generate_image(
 
     # prepare fp8 models
     if is_fp8(clip_l_dtype) and (not hasattr(clip_l, "fp8_prepared") or not clip_l.fp8_prepared):
-        logger.info(f"prepare CLIP-L for fp8: set to {clip_l_dtype}, set embeddings to {torch.bfloat16}")
+        print(f"prepare CLIP-L for fp8: set to {clip_l_dtype}, set embeddings to {torch.bfloat16}")
         clip_l.to(clip_l_dtype)  # fp8
         clip_l.text_model.embeddings.to(dtype=torch.bfloat16)
         clip_l.fp8_prepared = True
 
     if is_fp8(t5xxl_dtype) and (not hasattr(t5xxl, "fp8_prepared") or not t5xxl.fp8_prepared):
-        logger.info(f"prepare T5xxl for fp8: set to {t5xxl_dtype}")
+        print(f"prepare T5xxl for fp8: set to {t5xxl_dtype}")
 
         def prepare_fp8(text_encoder, target_dtype):
             def forward_hook(module):
@@ -266,7 +266,7 @@ def generate_image(
         t5xxl.fp8_prepared = True
 
     # prepare embeddings
-    logger.info("Encoding prompts...")
+    print("Encoding prompts...")
     clip_l = clip_l.to(device)
     t5xxl = t5xxl.to(device)
 
@@ -311,7 +311,7 @@ def generate_image(
     device_utils.clean_memory()
 
     # generate image
-    logger.info("Generating image...")
+    print("Generating image...")
     model = model.to(device)
     if steps is None:
         steps = 4 if is_schnell else 50
@@ -348,7 +348,7 @@ def generate_image(
     x = einops.rearrange(x, "b (h w) (c ph pw) -> b c (h ph) (w pw)", h=packed_latent_height, w=packed_latent_width, ph=2, pw=2)
 
     # decode
-    logger.info("Decoding image...")
+    print("Decoding image...")
     ae = ae.to(device)
     with torch.no_grad():
         if is_fp8(ae_dtype):
@@ -370,7 +370,7 @@ def generate_image(
     output_path = os.path.join(output_dir, f"{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
     img.save(output_path)
 
-    logger.info(f"Saved image to {output_path}")
+    print(f"Saved image to {output_path}")
 
 
 if __name__ == "__main__":
@@ -428,7 +428,7 @@ if __name__ == "__main__":
     ae_dtype = str_to_dtype(args.ae_dtype, dtype)
     flux_dtype = str_to_dtype(args.flux_dtype, dtype)
 
-    logger.info(f"Dtypes for clip_l, t5xxl, ae, flux: {clip_l_dtype}, {t5xxl_dtype}, {ae_dtype}, {flux_dtype}")
+    print(f"Dtypes for clip_l, t5xxl, ae, flux: {clip_l_dtype}, {t5xxl_dtype}, {ae_dtype}, {flux_dtype}")
 
     loading_device = "cpu" if args.offload else device
 
@@ -439,11 +439,11 @@ if __name__ == "__main__":
         accelerator = None
 
     # load clip_l
-    logger.info(f"Loading clip_l from {args.clip_l}...")
+    print(f"Loading clip_l from {args.clip_l}...")
     clip_l = flux_utils.load_clip_l(args.clip_l, clip_l_dtype, loading_device)
     clip_l.eval()
 
-    logger.info(f"Loading t5xxl from {args.t5xxl}...")
+    print(f"Loading t5xxl from {args.t5xxl}...")
     t5xxl = flux_utils.load_t5xxl(args.t5xxl, t5xxl_dtype, loading_device)
     t5xxl.eval()
 
@@ -455,7 +455,7 @@ if __name__ == "__main__":
     # DiT
     is_schnell, model = flux_utils.load_flow_model(args.ckpt_path, None, loading_device)
     model.eval()
-    logger.info(f"Casting model to {flux_dtype}")
+    print(f"Casting model to {flux_dtype}")
     model.to(flux_dtype)  # make sure model is dtype
     # if is_fp8(flux_dtype):
     #     model = accelerator.prepare(model)
@@ -499,7 +499,7 @@ if __name__ == "__main__":
         else:
             lora_model.apply_to([clip_l, t5xxl], model)
             info = lora_model.load_state_dict(weights_sd, strict=True)
-            logger.info(f"Loaded LoRA weights from {weights_file}: {info}")
+            print(f"Loaded LoRA weights from {weights_file}: {info}")
             lora_model.eval()
             lora_model.to(device)
 
@@ -558,7 +558,7 @@ if __name__ == "__main__":
                     elif opt.startswith("m"):
                         mutipliers = opt[1:].strip().split(",")
                         if len(mutipliers) != len(lora_models):
-                            logger.error(f"Invalid number of multipliers, expected {len(lora_models)}")
+                            print(f"Invalid number of multipliers, expected {len(lora_models)}")
                             continue
                         for i, lora_model in enumerate(lora_models):
                             lora_model.set_multiplier(float(mutipliers[i]))
@@ -569,8 +569,8 @@ if __name__ == "__main__":
                     elif opt.startswith("c"):
                         cfg_scale = float(opt[1:].strip())
                 except ValueError as e:
-                    logger.error(f"Invalid option: {opt}, {e}")
+                    print(f"Invalid option: {opt}, {e}")
 
             generate_image(model, clip_l, t5xxl, ae, prompt, seed, width, height, steps, guidance, negative_prompt, cfg_scale)
 
-    logger.info("Done!")
+    print("Done!")

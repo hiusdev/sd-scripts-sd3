@@ -10,12 +10,12 @@ from library import sd3_utils, train_util
 from library import sd3_models
 from library.strategy_base import LatentsCachingStrategy, TextEncodingStrategy, TokenizeStrategy, TextEncoderOutputsCachingStrategy
 
-from library.utils import setup_logging
 
-setup_logging()
-import logging
 
-logger = logging.getLogger(__name__)
+
+
+
+
 
 
 CLIP_L_TOKENIZER_ID = "openai/clip-vit-large-patch14"
@@ -303,7 +303,7 @@ class Sd3TextEncoderOutputsCachingStrategy(TextEncoderOutputsCachingStrategy):
             if npz_apply_t5_attn_mask != self.apply_t5_attn_mask:
                 return False
         except Exception as e:
-            logger.error(f"Error loading file: {npz_path}")
+            print(f"Error loading file: {npz_path}")
             raise e
 
         return True

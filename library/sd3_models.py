@@ -20,12 +20,12 @@ from transformers import CLIPTokenizer, T5TokenizerFast
 
 from library.device_utils import clean_memory_on_device
 
-from .utils import setup_logging
 
-setup_logging()
-import logging
 
-logger = logging.getLogger(__name__)
+
+
+
+
 
 
 memory_efficient_attention = None
@@ -1023,14 +1023,14 @@ class MMDiT(nn.Module):
             # # fallback to normal pos_embed
             # return self.cropped_pos_embed(h * p, w * p, device=device, random_crop=random_crop)
             # extend pos_embed size
-            logger.warning(
+            print(
                 f"Using normal pos_embed for size {h}x{w} as it exceeds the scaled pos_embed size {pos_embed_size}. Image is too tall or wide."
             )
             pos_embed_size = max(h, w)
             pos_embed = get_scaled_2d_sincos_pos_embed(self.hidden_size, pos_embed_size, sample_size=patched_size)
             pos_embed = torch.from_numpy(pos_embed).float().unsqueeze(0)
             self.resolution_pos_embeds[patched_size] = pos_embed
-            logger.info(f"Updated pos_embed for size {pos_embed_size}x{pos_embed_size}")
+            print(f"Updated pos_embed for size {pos_embed_size}x{pos_embed_size}")
 
         if not random_crop:
             top = (pos_embed_size - h) // 2

@@ -43,12 +43,12 @@ from library.custom_train_functions import (
     apply_debiased_estimation,
 )
 from library.sdxl_original_control_net import SdxlControlNet, SdxlControlledUNet
-from library.utils import setup_logging, add_logging_arguments
 
-setup_logging()
-import logging
 
-logger = logging.getLogger(__name__)
+
+
+
+
 
 
 # TODO 他のスクリプトと共通化する
@@ -69,7 +69,7 @@ def train(args):
     train_util.verify_training_args(args)
     train_util.prepare_dataset_args(args, True)
     sdxl_train_util.verify_sdxl_training_args(args)
-    setup_logging(args, reset=True)
+    
 
     cache_latents = args.cache_latents
     use_user_config = args.dataset_config is not None
@@ -91,11 +91,11 @@ def train(args):
     # データセットを準備する
     blueprint_generator = BlueprintGenerator(ConfigSanitizer(False, False, True, True))
     if use_user_config:
-        logger.info(f"Load dataset config from {args.dataset_config}")
+        print(f"Load dataset config from {args.dataset_config}")
         user_config = config_util.load_user_config(args.dataset_config)
         ignored = ["train_data_dir", "conditioning_data_dir"]
         if any(getattr(args, attr) is not None for attr in ignored):
-            logger.warning(
+            print(
                 "ignore following options because config file is found: {0} / 設定ファイルが利用されるため以下のオプションは無視されます: {0}".format(
                     ", ".join(ignored)
                 )
@@ -128,7 +128,7 @@ def train(args):
         train_util.debug_dataset(train_dataset_group)
         return
     if len(train_dataset_group) == 0:
-        logger.error(
+        print(
             "No data found. Please verify arguments (train_data_dir must be the parent of folders with images) / 画像がありません。引数指定を確認してください（train_data_dirには画像があるフォルダではなく、画像があるフォルダの親フォルダを指定する必要があります）"
         )
         return
@@ -138,7 +138,7 @@ def train(args):
             train_dataset_group.is_latent_cacheable()
         ), "when caching latents, either color_aug or random_crop cannot be used / latentをキャッシュするときはcolor_augとrandom_cropは使えません"
     else:
-        logger.warning(
+        print(
             "WARNING: random_crop is not supported yet for ControlNet training / ControlNetの学習ではrandom_cropはまだサポートされていません"
         )
 
@@ -148,7 +148,7 @@ def train(args):
         ), "when caching Text Encoder output, either caption_dropout_rate, shuffle_caption, token_warmup_step or caption_tag_dropout_rate cannot be used / Text Encoderの出力をキャッシュするときはcaption_dropout_rate, shuffle_caption, token_warmup_step, caption_tag_dropout_rateは使えません"
 
     # acceleratorを準備する
-    logger.info("prepare accelerator")
+    print("prepare accelerator")
     accelerator = train_util.prepare_accelerator(args)
     is_main_process = accelerator.is_main_process
 
@@ -175,7 +175,7 @@ def train(args):
     unet.to(accelerator.device)  # reduce main memory usage
 
     # convert U-Net to Controlled U-Net
-    logger.info("convert U-Net to Controlled U-Net")
+    print("convert U-Net to Controlled U-Net")
     unet_sd = unet.state_dict()
     with init_empty_weights():
         unet = SdxlControlledUNet()
@@ -183,25 +183,25 @@ def train(args):
     del unet_sd
 
     # make control net
-    logger.info("make ControlNet")
+    print("make ControlNet")
     if args.controlnet_model_path:
         with init_empty_weights():
             control_net = SdxlControlNet()
 
-        logger.info(f"load ControlNet from {args.controlnet_model_path}")
+        print(f"load ControlNet from {args.controlnet_model_path}")
         filename = args.controlnet_model_path
         if os.path.splitext(filename)[1] == ".safetensors":
             state_dict = load_file(filename)
         else:
             state_dict = torch.load(filename)
         info = control_net.load_state_dict(state_dict, strict=True, assign=True)
-        logger.info(f"ControlNet loaded from {filename}: {info}")
+        print(f"ControlNet loaded from {filename}: {info}")
     else:
         control_net = SdxlControlNet()
 
-        logger.info("initialize ControlNet from U-Net")
+        print("initialize ControlNet from U-Net")
         info = control_net.init_from_unet(unet)
-        logger.info(f"ControlNet initialized from U-Net: {info}")
+        print(f"ControlNet initialized from U-Net: {info}")
 
     # 学習を準備する
     if cache_latents:
@@ -262,8 +262,8 @@ def train(args):
     trainable_params.append({"params": unet_params, "lr": args.learning_rate})
     all_params = ctrlnet_params + unet_params
 
-    logger.info(f"trainable params count: {len(all_params)}")
-    logger.info(f"number of trainable parameters: {sum(p.numel() for p in all_params)}")
+    print(f"trainable params count: {len(all_params)}")
+    print(f"number of trainable parameters: {sum(p.numel() for p in all_params)}")
 
     _, _, optimizer = train_util.get_optimizer(args, trainable_params)
 
@@ -382,7 +382,7 @@ def train(args):
     accelerator.print(
         f"  batch size per device / バッチサイズ: {', '.join([str(d.batch_size) for d in train_dataset_group.datasets])}"
     )
-    # logger.info(f"  total train batch size (with parallel & distributed & accumulation) / 総バッチサイズ（並列学習、勾配合計含む）: {total_batch_size}")
+    # print(f"  total train batch size (with parallel & distributed & accumulation) / 総バッチサイズ（並列学習、勾配合計含む）: {total_batch_size}")
     accelerator.print(f"  gradient accumulation steps / 勾配を合計するステップ数 = {args.gradient_accumulation_steps}")
     accelerator.print(f"  total optimization steps / 学習ステップ数: {args.max_train_steps}")
 
@@ -659,13 +659,13 @@ def train(args):
         ckpt_name = train_util.get_last_ckpt_name(args, "." + args.save_model_as)
         save_model(ckpt_name, control_net, force_sync_upload=True)
 
-        logger.info("model saved.")
+        print("model saved.")
 
 
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
 
-    add_logging_arguments(parser)
+    
     train_util.add_sd_models_arguments(parser)
     train_util.add_dataset_arguments(parser, False, True, True)
     train_util.add_training_arguments(parser, False)

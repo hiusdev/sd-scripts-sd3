@@ -6,12 +6,12 @@ import torch
 from transformers import CLIPTokenizer
 from library import train_util
 from library.strategy_base import LatentsCachingStrategy, TokenizeStrategy, TextEncodingStrategy
-from library.utils import setup_logging
 
-setup_logging()
-import logging
 
-logger = logging.getLogger(__name__)
+
+
+
+
 
 
 TOKENIZER_ID = "openai/clip-vit-large-patch14"
@@ -23,7 +23,7 @@ class SdTokenizeStrategy(TokenizeStrategy):
         """
         max_length does not include <BOS> and <EOS> (None, 75, 150, 225)
         """
-        logger.info(f"Using {'v2' if v2 else 'v1'} tokenizer")
+        print(f"Using {'v2' if v2 else 'v1'} tokenizer")
         if v2:
             self.tokenizer = self._load_tokenizer(
                 CLIPTokenizer, V2_STABLE_DIFFUSION_ID, subfolder="tokenizer", tokenizer_cache_dir=tokenizer_cache_dir

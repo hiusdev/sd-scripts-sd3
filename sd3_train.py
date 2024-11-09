@@ -26,12 +26,6 @@ from library.sdxl_train_util import match_mixed_precision
 
 import library.train_util as train_util
 
-from library.utils import setup_logging, add_logging_arguments
-
-setup_logging()
-import logging
-
-logger = logging.getLogger(__name__)
 
 import library.config_util as config_util
 
@@ -57,7 +51,7 @@ def train(args):
     train_util.prepare_dataset_args(args, True)
     # sdxl_train_util.verify_sdxl_training_args(args)
     deepspeed_utils.prepare_deepspeed_args(args)
-    setup_logging(args, reset=True)
+    
 
     # temporary: backward compatibility for deprecated options. remove in the future
     if not args.skip_cache_check:
@@ -70,7 +64,7 @@ def train(args):
     #     not args.train_text_encoder or not args.cache_text_encoder_outputs
     # ), "cache_text_encoder_outputs is not supported when training text encoder / text encoderを学習するときはcache_text_encoder_outputsはサポートされていません"
     if args.cache_text_encoder_outputs_to_disk and not args.cache_text_encoder_outputs:
-        logger.warning(
+        print(
             "cache_text_encoder_outputs_to_disk is enabled, so cache_text_encoder_outputs is also enabled / cache_text_encoder_outputs_to_diskが有効になっているため、cache_text_encoder_outputsも有効になります"
         )
         args.cache_text_encoder_outputs = True
@@ -81,7 +75,7 @@ def train(args):
     )
 
     if args.use_t5xxl_cache_only and not args.cache_text_encoder_outputs:
-        logger.warning(
+        print(
             "use_t5xxl_cache_only is enabled, so cache_text_encoder_outputs is automatically enabled."
             + " / use_t5xxl_cache_onlyが有効なため、cache_text_encoder_outputsも自動的に有効になります"
         )
@@ -112,18 +106,18 @@ def train(args):
     if args.dataset_class is None:
         blueprint_generator = BlueprintGenerator(ConfigSanitizer(True, True, args.masked_loss, True))
         if args.dataset_config is not None:
-            logger.info(f"Load dataset config from {args.dataset_config}")
+            print(f"Load dataset config from {args.dataset_config}")
             user_config = config_util.load_user_config(args.dataset_config)
             ignored = ["train_data_dir", "in_json"]
             if any(getattr(args, attr) is not None for attr in ignored):
-                logger.warning(
+                print(
                     "ignore following options because config file is found: {0} / 設定ファイルが利用されるため以下のオプションは無視されます: {0}".format(
                         ", ".join(ignored)
                     )
                 )
         else:
             if use_dreambooth_method:
-                logger.info("Using DreamBooth method.")
+                print("Using DreamBooth method.")
                 user_config = {
                     "datasets": [
                         {
@@ -134,7 +128,7 @@ def train(args):
                     ]
                 }
             else:
-                logger.info("Training with captions.")
+                print("Training with captions.")
                 user_config = {
                     "datasets": [
                         {
@@ -176,7 +170,7 @@ def train(args):
         train_util.debug_dataset(train_dataset_group, True)
         return
     if len(train_dataset_group) == 0:
-        logger.error(
+        print(
             "No data found. Please verify the metadata file and train_data_dir option. / 画像がありません。メタデータおよびtrain_data_dirオプションを確認してください。"
         )
         return
@@ -192,7 +186,7 @@ def train(args):
         ), "when caching text encoder output, either caption_dropout_rate, shuffle_caption, token_warmup_step or caption_tag_dropout_rate cannot be used / text encoderの出力をキャッシュするときはcaption_dropout_rate, shuffle_caption, token_warmup_step, caption_tag_dropout_rateは使えません"
 
     # acceleratorを準備する
-    logger.info("prepare accelerator")
+    print("prepare accelerator")
     accelerator = train_util.prepare_accelerator(args)
 
     # mixed precisionに対応した型を用意しておき適宜castする
@@ -303,14 +297,14 @@ def train(args):
 
         # cache sample prompt's embeddings to free text encoder's memory
         if args.sample_prompts is not None:
-            logger.info(f"cache Text Encoder outputs for sample prompt: {args.sample_prompts}")
+            print(f"cache Text Encoder outputs for sample prompt: {args.sample_prompts}")
             prompts = train_util.load_prompts(args.sample_prompts)
             sample_prompts_te_outputs = {}  # key: prompt, value: text encoder outputs
             with accelerator.autocast(), torch.no_grad():
                 for prompt_dict in prompts:
                     for p in [prompt_dict.get("prompt", ""), prompt_dict.get("negative_prompt", "")]:
                         if p not in sample_prompts_te_outputs:
-                            logger.info(f"cache Text Encoder outputs for prompt: {p}")
+                            print(f"cache Text Encoder outputs for prompt: {p}")
                             tokens_and_masks = sd3_tokenize_strategy.tokenize(p)
                             sample_prompts_te_outputs[p] = text_encoding_strategy.encode_tokens(
                                 sd3_tokenize_strategy,
@@ -333,7 +327,7 @@ def train(args):
 
     # load VAE for caching latents
     if sd3_state_dict is None:
-        logger.info(f"load state dict for MMDiT and VAE from {args.pretrained_model_name_or_path}")
+        print(f"load state dict for MMDiT and VAE from {args.pretrained_model_name_or_path}")
         sd3_state_dict = utils.load_safetensors(
             args.pretrained_model_name_or_path, "cpu", args.disable_mmap_load_safetensors, model_dtype
         )
@@ -367,7 +361,7 @@ def train(args):
         resolutions = train_dataset_group.get_resolutions()
         latent_sizes = [round(math.sqrt(res[0] * res[1])) // 8 for res in resolutions]  # 8 is stride for latent
         latent_sizes = list(set(latent_sizes))  # remove duplicates
-        logger.info(f"Prepare scaled positional embeddings for resolutions: {resolutions}, sizes: {latent_sizes}")
+        print(f"Prepare scaled positional embeddings for resolutions: {resolutions}, sizes: {latent_sizes}")
         mmdit.enable_scaled_pos_embed(True, latent_sizes)
 
     if args.gradient_checkpointing:
@@ -383,7 +377,7 @@ def train(args):
     if is_swapping_blocks:
         # Swap blocks between CPU and GPU to reduce memory usage, in forward and backward passes.
         # This idea is based on 2kpr's great work. Thank you!
-        logger.info(f"enable block swap: blocks_to_swap={args.blocks_to_swap}")
+        print(f"enable block swap: blocks_to_swap={args.blocks_to_swap}")
         mmdit.enable_block_swap(args.blocks_to_swap)
 
     if not cache_latents:
@@ -490,7 +484,7 @@ def train(args):
             optimizers.append(optimizer)
         optimizer = optimizers[0]  # avoid error in the following code
 
-        logger.info(f"using {len(optimizers)} optimizers for blockwise fused optimizers")
+        print(f"using {len(optimizers)} optimizers for blockwise fused optimizers")
 
         if train_util.is_schedulefree_optimizer(optimizers[0], args):
             raise ValueError("Schedule-free optimizer is not supported with blockwise fused optimizers")
@@ -838,27 +832,27 @@ def train(args):
         accelerator.log({}, step=0)
 
     # show model device and dtype
-    logger.info(
+    print(
         f"mmdit device: {accelerator.unwrap_model(mmdit).device}, dtype: {accelerator.unwrap_model(mmdit).dtype}"
         if mmdit
         else "mmdit is None"
     )
-    logger.info(
+    print(
         f"clip_l device: {accelerator.unwrap_model(clip_l).device}, dtype: {accelerator.unwrap_model(clip_l).dtype}"
         if clip_l
         else "clip_l is None"
     )
-    logger.info(
+    print(
         f"clip_g device: {accelerator.unwrap_model(clip_g).device}, dtype: {accelerator.unwrap_model(clip_g).dtype}"
         if clip_g
         else "clip_g is None"
     )
-    logger.info(
+    print(
         f"t5xxl device: {accelerator.unwrap_model(t5xxl).device}, dtype: {accelerator.unwrap_model(t5xxl).dtype}"
         if t5xxl
         else "t5xxl is None"
     )
-    logger.info(
+    print(
         f"vae device: {accelerator.unwrap_model(vae).device}, dtype: {accelerator.unwrap_model(vae).dtype}"
         if vae is not None
         else "vae is None"
@@ -1114,13 +1108,13 @@ def train(args):
             mmdit if train_mmdit else None,
             vae,
         )
-        logger.info("model saved.")
+        print("model saved.")
 
 
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
 
-    add_logging_arguments(parser)
+    
     train_util.add_sd_models_arguments(parser)
     train_util.add_dataset_arguments(parser, True, True, True)
     train_util.add_training_arguments(parser, False)

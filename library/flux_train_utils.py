@@ -19,12 +19,12 @@ from library.device_utils import init_ipex, clean_memory_on_device
 
 init_ipex()
 
-from .utils import setup_logging, mem_eff_save_file
+from .utils import  mem_eff_save_file
 
-setup_logging()
-import logging
 
-logger = logging.getLogger(__name__)
+
+
+
 
 
 # region sample images
@@ -55,10 +55,10 @@ def sample_images(
             if steps % args.sample_every_n_steps != 0 or epoch is not None:  # steps is not divisible or end of epoch
                 return
 
-    logger.info("")
-    logger.info(f"generating sample images at step / サンプル画像生成 ステップ: {steps}")
+    print("")
+    print(f"generating sample images at step / サンプル画像生成 ステップ: {steps}")
     if not os.path.isfile(args.sample_prompts) and sample_prompts_te_outputs is None:
-        logger.error(f"No prompt file / プロンプトファイルがありません: {args.sample_prompts}")
+        print(f"No prompt file / プロンプトファイルがありません: {args.sample_prompts}")
         return
 
     distributed_state = PartialState()  # for multi gpu distributed inference. this is a singleton, so it's safe to use it here
@@ -172,15 +172,15 @@ def sample_image_inference(
 
     height = max(64, height - height % 16)  # round to divisible by 16
     width = max(64, width - width % 16)  # round to divisible by 16
-    logger.info(f"prompt: {prompt}")
-    # logger.info(f"negative_prompt: {negative_prompt}")
-    logger.info(f"height: {height}")
-    logger.info(f"width: {width}")
-    logger.info(f"sample_steps: {sample_steps}")
-    logger.info(f"scale: {scale}")
-    # logger.info(f"sample_sampler: {sampler_name}")
+    print(f"prompt: {prompt}")
+    # print(f"negative_prompt: {negative_prompt}")
+    print(f"height: {height}")
+    print(f"width: {width}")
+    print(f"sample_steps: {sample_steps}")
+    print(f"scale: {scale}")
+    # print(f"sample_sampler: {sampler_name}")
     if seed is not None:
-        logger.info(f"seed: {seed}")
+        print(f"seed: {seed}")
 
     # encode prompts
     tokenize_strategy = strategy_base.TokenizeStrategy.get_strategy()

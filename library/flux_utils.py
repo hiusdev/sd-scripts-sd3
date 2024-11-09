@@ -10,12 +10,12 @@ from safetensors import safe_open
 from accelerate import init_empty_weights
 from transformers import CLIPTextModel, CLIPConfig, T5EncoderModel, T5Config
 
-from library.utils import setup_logging
 
-setup_logging()
-import logging
 
-logger = logging.getLogger(__name__)
+
+
+
+
 
 from library import flux_models
 from library.utils import load_safetensors
@@ -40,7 +40,7 @@ def analyze_checkpoint_state(ckpt_path: str) -> Tuple[bool, bool, Tuple[int, int
             - List[str]: チェックポイントに含まれるキーのリスト。
     """
     # check the state dict: Diffusers or BFL, dev or schnell, number of blocks
-    logger.info(f"Checking the state dict: Diffusers or BFL, dev or schnell")
+    print(f"Checking the state dict: Diffusers or BFL, dev or schnell")
 
     if os.path.isdir(ckpt_path):  # if ckpt_path is a directory, it is Diffusers
         ckpt_path = os.path.join(ckpt_path, "transformer", "diffusion_pytorch_model-00001-of-00003.safetensors")
@@ -98,16 +98,16 @@ def load_flow_model(
     name = MODEL_NAME_DEV if not is_schnell else MODEL_NAME_SCHNELL
 
     # build model
-    logger.info(f"Building Flux model {name} from {'Diffusers' if is_diffusers else 'BFL'} checkpoint")
+    print(f"Building Flux model {name} from {'Diffusers' if is_diffusers else 'BFL'} checkpoint")
     with torch.device("meta"):
         params = flux_models.configs[name].params
 
         # set the number of blocks
         if params.depth != num_double_blocks:
-            logger.info(f"Setting the number of double blocks from {params.depth} to {num_double_blocks}")
+            print(f"Setting the number of double blocks from {params.depth} to {num_double_blocks}")
             params = replace(params, depth=num_double_blocks)
         if params.depth_single_blocks != num_single_blocks:
-            logger.info(f"Setting the number of single blocks from {params.depth_single_blocks} to {num_single_blocks}")
+            print(f"Setting the number of single blocks from {params.depth_single_blocks} to {num_single_blocks}")
             params = replace(params, depth_single_blocks=num_single_blocks)
 
         model = flux_models.Flux(params)
@@ -115,16 +115,16 @@ def load_flow_model(
             model = model.to(dtype)
 
     # load_sft doesn't support torch.device
-    logger.info(f"Loading state dict from {ckpt_path}")
+    print(f"Loading state dict from {ckpt_path}")
     sd = {}
     for ckpt_path in ckpt_paths:
         sd.update(load_safetensors(ckpt_path, device=str(device), disable_mmap=disable_mmap, dtype=dtype))
 
     # convert Diffusers to BFL
     if is_diffusers:
-        logger.info("Converting Diffusers to BFL")
+        print("Converting Diffusers to BFL")
         sd = convert_diffusers_sd_to_bfl(sd, num_double_blocks, num_single_blocks)
-        logger.info("Converted Diffusers to BFL")
+        print("Converted Diffusers to BFL")
 
     # if the key has annoying prefix, remove it
     for key in list(sd.keys()):
@@ -134,22 +134,22 @@ def load_flow_model(
         sd[new_key] = sd.pop(key)
 
     info = model.load_state_dict(sd, strict=False, assign=True)
-    logger.info(f"Loaded Flux: {info}")
+    print(f"Loaded Flux: {info}")
     return is_schnell, model
 
 
 def load_ae(
     ckpt_path: str, dtype: torch.dtype, device: Union[str, torch.device], disable_mmap: bool = False
 ) -> flux_models.AutoEncoder:
-    logger.info("Building AutoEncoder")
+    print("Building AutoEncoder")
     with torch.device("meta"):
         # dev and schnell have the same AE params
         ae = flux_models.AutoEncoder(flux_models.configs[MODEL_NAME_DEV].ae_params).to(dtype)
 
-    logger.info(f"Loading state dict from {ckpt_path}")
+    print(f"Loading state dict from {ckpt_path}")
     sd = load_safetensors(ckpt_path, device=str(device), disable_mmap=disable_mmap, dtype=dtype)
     info = ae.load_state_dict(sd, strict=False, assign=True)
-    logger.info(f"Loaded AE: {info}")
+    print(f"Loaded AE: {info}")
     return ae
 
 
@@ -160,7 +160,7 @@ def load_clip_l(
     disable_mmap: bool = False,
     state_dict: Optional[dict] = None,
 ) -> CLIPTextModel:
-    logger.info("Building CLIP-L")
+    print("Building CLIP-L")
     CLIPL_CONFIG = {
         "_name_or_path": "clip-vit-large-patch14/",
         "architectures": ["CLIPModel"],
@@ -256,10 +256,10 @@ def load_clip_l(
     if state_dict is not None:
         sd = state_dict
     else:
-        logger.info(f"Loading state dict from {ckpt_path}")
+        print(f"Loading state dict from {ckpt_path}")
         sd = load_safetensors(ckpt_path, device=str(device), disable_mmap=disable_mmap, dtype=dtype)
     info = clip.load_state_dict(sd, strict=False, assign=True)
-    logger.info(f"Loaded CLIP-L: {info}")
+    print(f"Loaded CLIP-L: {info}")
     return clip
 
 
@@ -311,10 +311,10 @@ def load_t5xxl(
     if state_dict is not None:
         sd = state_dict
     else:
-        logger.info(f"Loading state dict from {ckpt_path}")
+        print(f"Loading state dict from {ckpt_path}")
         sd = load_safetensors(ckpt_path, device=str(device), disable_mmap=disable_mmap, dtype=dtype)
     info = t5xxl.load_state_dict(sd, strict=False, assign=True)
-    logger.info(f"Loaded T5xxl: {info}")
+    print(f"Loaded T5xxl: {info}")
     return t5xxl
 
 
@@ -445,7 +445,7 @@ def convert_diffusers_sd_to_bfl(
                 flux_sd[bfl_key] = []
             flux_sd[bfl_key].append((index, tensor))
         else:
-            logger.error(f"Error: Key not found in diffusers_to_bfl_map: {diffusers_key}")
+            print(f"Error: Key not found in diffusers_to_bfl_map: {diffusers_key}")
             raise KeyError(f"Key not found in diffusers_to_bfl_map: {diffusers_key}")
 
     # concat tensors if multiple tensors are mapped to a single key, sort by index
